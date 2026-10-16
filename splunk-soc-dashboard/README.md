@@ -27,17 +27,15 @@ The dashboard evaluates active network logs against these specific structural ru
 ### 1. Global Metrics & Ingress Timelines
 The main interface dashboard panels provide a real-time view of unified endpoint brute force alerts, perimeter VPN drops, and high-priority account targeting metrics.
 
-*Insert your top metrics screenshot here:*
-![SOC Dashboard Top Metrics](dashboard_top.png)
+![SOC Dashboard Top Metrics](splunk-soc-dashboard/dashboard_top.png)
 
 ### 2. Behavioral Threat Hunting & Framework Mappings
 Displays the multi-vector array hunting table showing compressed attacking IP lists right next to the active MITRE ATT&CK matrix mappings.
 
-*Insert your bottom tables screenshot here:*
-![SOC Dashboard Analytics Matrix](dashboard_bottom.png)
+![SOC Dashboard Analytics Matrix](splunk-soc-dashboard/dashboard_bottom.png)
 
 ---
 
 ## 📦 Repository Structure
-* `/src/dashboard_source.json` - Native Splunk Dashboard Studio source layout JSON definition code for seamless absolute layout environment replication.
-* `/queries/SPL_Queries.md` - Complete performance-tuned catalog detailing the advanced data-coalescing and string-limiting queries used.
+* `/splunk-soc-dashboard/src/dashboard_source.json` - Native Splunk Dashboard Studio source layout JSON definition code for seamless absolute layout environment replication.
+* `/splunk-soc-dashboard/queries/SPL_Queries.md` - Complete performance-tuned catalog detailing the advanced data-coalescing and string-limiting queries used.
