@@ -1,41 +1,47 @@
-# Enterprise SIEM Security Analytics & Behavioral Detection Platform
+# Splunk SOC Dashboard
 
-An enterprise-grade Security Operations Center (SOC) dashboard built native to Splunk Dashboard Studio. The platform ingests, normalizes, and behaviorally analyzes multi-platform infrastructure logs—including Windows Active Directory (`winauthentication_security`), distributed Linux systems (`linux_secure`), and Cisco Perimeter Firewalls (`cisco_firewall`)—to expose complex threat indicators and map operational anomalies directly to the MITRE ATT&CK® framework.
+A Security Operations Center (SOC) dashboard built in Splunk Dashboard Studio. It searches Windows authentication logs and Cisco firewall logs, groups the results into detections, and maps each detection to a MITRE ATT&CK technique.
 
-## 🚀 Key Engineering Highlights
-Unlike entry-level dashboard tools that pull static files, this platform implements active **SIEM Engineering** and **Detection Engineering**:
-* **🛡️ High-Cardinality Behavioral Profiling:** Leverages advanced Splunk array functions (`mvindex`, `mvjoin`) and distinct count tracking (`dc(src_ip)`) to isolate distributed brute-force actions (e.g., 47 unique attacking sources targeting a single identity context) into a compressed, high-density threat hunting view.
-* **🧱 Network Gateway Boundary Auditing:** Parses Cisco ASA Firewall connection states via targeted text string indexing to isolate unexpected perimeter disruptions (`Connection Lost`) and session eviction risks.
-* **🗺️ Tactical Threat Attribution Matrix:** Interrogates multi-source event payloads programmatically via logical evaluation structures, automatically mapping vendor-specific telemetry to globally recognized adversary tactics (`T1110`, `T1133`, `T1078`).
+**Data source:** Sample Windows authentication and Cisco firewall logs loaded in a Splunk Enterprise test instance.
 
----
+## Data Sources
 
-## 🛡️ Detection Engineering Logic & Rules
+| Sourcetype | Matching rule |
+|---|---|
+| `winauthentication_security` | Failed logons, EventCode 4625 |
+| `cisco_firewall` | Events containing "Connection Lost" |
+| `linux_secure` | Events containing "Failed password". These queries are included but were not tested, because no Linux data was loaded. |
 
-The dashboard evaluates active network logs against these specific structural rule thresholds:
+## Detections
 
-| Threat Vector | Telemetry Logic & Extraction Profile | Assigned Severity | Targeted MITRE ATT&CK ID |
-| :--- | :--- | :--- | :--- |
-| **Privileged Account Target** | Failed authentication attempts isolating administrative vectors (`root` / `Administrator`) | **CRITICAL** | `T1078` (Valid Accounts) |
-| **Distributed Brute Force** | Distinct tracking (`dc(src_ip) > 1`) evaluating concurrent attack origins targeting a single user identity | **HIGH** | `T1110` (Brute Force) |
-| **Boundary Session Drop** | Abrupt remote workforce VPN disconnection signatures indicating boundary instability | **MEDIUM** | `T1133` (External Remote Services) |
+| Detection | Logic | Severity | MITRE ATT&CK |
+|---|---|---|---|
+| Privileged account failures | Failed logins where the target user is `root` or `Administrator` | CRITICAL | T1078 (Valid Accounts) |
+| Standard endpoint brute force | Failed logins for any other user | HIGH | T1110 (Brute Force) |
+| Connection Lost events | Events containing "Connection Lost" on Cisco firewall logs | MEDIUM | T1133 (External Remote Services) |
 
----
+The MITRE mapping is a rule-based classification. It labels events by these rules and does not confirm that an attack occurred.
 
-## 🖥️ Live Dashboard Overview
+## Dashboard Panels
 
-### 1. Global Metrics & Ingress Timelines
-The main interface dashboard panels provide a real-time view of unified endpoint brute force alerts, perimeter VPN drops, and high-priority account targeting metrics.
+1. **Brute Force Alerts:** count of failed authentication events.
+2. **Top Targeted User Accounts:** the five accounts with the most failed logins.
+3. **Abrupt VPN Drops:** count of "Connection Lost" events on Cisco firewall logs.
+4. **MITRE ATT&CK Framework Mapping:** event counts grouped by attack type, severity, and MITRE ID.
+5. **Multi IP Search:** for each target user with more than one distinct source IP, the count of distinct IPs and the list of those IPs.
 
-![SOC Dashboard Top Metrics](splunk-soc-dashboard/dashboard_top.png)
+## Repository Structure
 
-### 2. Behavioral Threat Hunting & Framework Mappings
-Displays the multi-vector array hunting table showing compressed attacking IP lists right next to the active MITRE ATT&CK matrix mappings.
+- `splunk-soc-dashboard/dashboard_source.json`: Splunk Dashboard Studio source, containing the five searches and the layout.
+- `splunk-soc-dashboard/dashboard_top.png` and `splunk-soc-dashboard/dashboard_bottom.png`: screenshots of the dashboard.
 
-![SOC Dashboard Analytics Matrix](splunk-soc-dashboard/dashboard_bottom.png)
+## Testing
 
----
+The dashboard was loaded into a Splunk Enterprise instance with 503,288 events across 8 sourcetypes, including 10,210 `winauthentication_security` events and 517 `cisco_firewall` events. The panels have not yet been checked one by one. No `linux_secure` data was loaded, so Linux-dependent results were not tested.
 
-## 📦 Repository Structure
-* `/splunk-soc-dashboard/src/dashboard_source.json` - Native Splunk Dashboard Studio source layout JSON definition code for seamless absolute layout environment replication.
-* `/splunk-soc-dashboard/queries/SPL_Queries.md` - Complete performance-tuned catalog detailing the advanced data-coalescing and string-limiting queries used.
+## Limitations
+
+- The dashboard runs on static sample data, not live log ingestion.
+- "Connection Lost" matches any Cisco firewall event containing that text. It is not confirmed to be VPN-specific.
+- The privileged account rule fires on any single failed login for `root` or `Administrator`. It does not count attempts.
+- The Multi IP and MITRE panels depend on fields such as `user` and `ip` being present in the Windows events. This has not been verified.
