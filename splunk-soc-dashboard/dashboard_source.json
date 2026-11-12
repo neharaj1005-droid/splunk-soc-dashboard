@@ -1,236 +1,216 @@
 {
-    "title": "SOC Log Analyzer Dashboard",
-    "description": "",
-    "inputs": {
-        "input_global_trp": {
-            "options": {
-                "defaultValue": "-24h@h,now",
-                "token": "global_time"
-            },
-            "title": "Global Time Range",
-            "type": "input.timerange"
-        }
+  "visualizations": {
+    "viz_LXdy2vxR": {
+      "type": "splunk.singlevalue",
+      "options": {},
+      "dataSources": {
+        "primary": "ds_ujx0hRgv"
+      }
     },
-    "defaults": {
-        "dataSources": {
-            "ds.search": {
-                "options": {
-                    "queryParameters": {
-                        "earliest": "$global_time.earliest$",
-                        "latest": "$global_time.latest$"
-                    }
-                }
-            }
-        },
-        "visualizations": {
-            "global": {
-                "showProgressBar": true
-            }
+    "viz_c83aCXmf": {
+      "type": "splunk.bar",
+      "options": {},
+      "dataSources": {
+        "primary": "ds_JWYom4q8"
+      }
+    },
+    "viz_cHCG3sSh": {
+      "type": "splunk.singlevalue",
+      "options": {},
+      "dataSources": {
+        "primary": "ds_DvfQhx4e"
+      }
+    },
+    "viz_lncVDDh8": {
+      "type": "splunk.table",
+      "options": {},
+      "dataSources": {
+        "primary": "ds_7kHTl9yY"
+      }
+    },
+    "viz_kSAFyUE3": {
+      "type": "splunk.table",
+      "options": {},
+      "dataSources": {
+        "primary": "ds_7NtOJr58"
+      }
+    }
+  },
+  "dataSources": {
+    "ds_ujx0hRgv": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=* ((sourcetype=linux_secure \"Failed password\") OR (sourcetype=winauthentication_security EventCode=4625))\r\n| stats count as \"Brute Force Alerts\"\r\n"
+      },
+      "name": "Brute Force Alerts"
+    },
+    "ds_JWYom4q8": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=* ((sourcetype=linux_secure \"Failed password\") OR (sourcetype=winauthentication_security EventCode=4625))\r\n| rex field=_raw \"for (?<linux_user>\\S+) from\"\r\n| rex field=_raw \"User=(?<win_user>\\S+)\"\r\n| eval target_user=coalesce(win_user, linux_user)\r\n| stats count by target_user\r\n| sort - count\r\n| head 5\r\n"
+      },
+      "name": "Top Targeted User Accounts"
+    },
+    "ds_DvfQhx4e": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=* sourcetype=cisco_firewall \"Connection Lost\"\r\n| stats count as \"Abrupt VPN Drops\"\r\n"
+      },
+      "name": "Abrupt VPN Drops"
+    },
+    "ds_7kHTl9yY": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=* ((sourcetype=linux_secure \"Failed password\") OR (sourcetype=winauthentication_security EventCode=4625) OR (sourcetype=cisco_firewall \"Connection Lost\"))\r\n| rex field=_raw \"for (?<linux_user>\\S+) from\"\r\n| rex field=_raw \"User=(?<win_user>\\S+)\"\r\n| eval target_user=coalesce(win_user, linux_user)\r\n| eval Attack_Type=case(\r\n    target_user==\"root\" OR target_user==\"Administrator\", \"Privileged Account Brute Force\", \r\n    sourcetype==\"cisco_firewall\", \"Abrupt Boundary Session Drop\", \r\n    1=1, \"Standard Endpoint Brute Force\")\r\n| eval MITRE_ID=case(\r\n    Attack_Type==\"Privileged Account Brute Force\", \"T1078 (Valid Accounts)\", \r\n    Attack_Type==\"Abrupt Boundary Session Drop\", \"T1133 (External Remote Services)\", \r\n    Attack_Type==\"Standard Endpoint Brute Force\", \"T1110 (Brute Force)\")\r\n| eval Severity=case(\r\n    Attack_Type==\"Privileged Account Brute Force\", \"CRITICAL\", \r\n    Attack_Type==\"Abrupt Boundary Session Drop\", \"MEDIUM\", \r\n    Attack_Type==\"Standard Endpoint Brute Force\", \"HIGH\")\r\n| stats count by Attack_Type, Severity, MITRE_ID\r\n| rename count as \"Event Count\"\r\n| sort - \"Event Count\"\r\n"
+      },
+      "name": "MITRE ATTACK"
+    },
+    "ds_7NtOJr58": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=* ((sourcetype=linux_secure \"Failed password\") OR (sourcetype=winauthentication_security EventCode=4625))\r\n| rex field=_raw \"(?<extracted_ip>\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\"\r\n| rex field=_raw \"for (?<linux_user>\\S+) from\"\r\n| rex field=_raw \"User=(?<win_user>\\S+)\"\r\n| eval target_user=coalesce(win_user, linux_user)\r\n| where isnotnull(target_user) AND isnotnull(extracted_ip)\r\n| stats dc(extracted_ip) as unique_ips values(extracted_ip) as attacking_sources by target_user\r\n| where unique_ips > 1\r\n| eval top_ips=mvindex(attacking_sources, 0, 4)\r\n| eval \"Attacking IP List\"=mvjoin(top_ips, \", \") . if(unique_ips>5, \" ... (and \" . (unique_ips-5) . \" more)\", \"\")\r\n| rename unique_ips as \"Distinct Attacking IPs\", target_user as \"Compromised Target User\"\r\n| table \"Compromised Target User\", \"Distinct Attacking IPs\", \"Attacking IP List\"\r\n| sort - \"Distinct Attacking IPs\"\r\n"
+      },
+      "name": "Multi IP Search"
+    }
+  },
+  "defaults": {
+    "dataSources": {
+      "ds.search": {
+        "options": {
+          "queryParameters": {
+            "latest": "$global_time.latest$",
+            "earliest": "$global_time.earliest$"
+          }
         }
+      }
     },
     "visualizations": {
-        "viz_1O4xXdO0": {
-            "containerOptions": {},
-            "context": {},
-            "dataSources": {
-                "primary": "ds_0RbSTeqq"
-            },
-            "options": {},
-            "showLastUpdated": false,
-            "showProgressBar": true,
-            "title": "Abrupt VPN Drops",
-            "type": "splunk.singlevalue"
-        },
-        "viz_EUi96nVp": {
-            "dataSources": {
-                "primary": "ds_0mnruKyA"
-            },
-            "options": {
-                "count": 20,
-                "dataOverlayMode": "none",
-                "drilldown": "none",
-                "showInternalFields": false,
-                "showRowNumbers": false
-            },
-            "title": "MITRE ATT&CK Framework Mapping",
-            "type": "splunk.table"
-        },
-        "viz_JluEFgMm": {
-            "containerOptions": {},
-            "context": {},
-            "dataSources": {
-                "primary": "ds_s6i7OhqB"
-            },
-            "options": {},
-            "showLastUpdated": false,
-            "showProgressBar": true,
-            "title": "Multi IP Search",
-            "type": "splunk.table"
-        },
-        "viz_iB7BBZ0h": {
-            "containerOptions": {},
-            "context": {},
-            "dataSources": {
-                "primary": "ds_bnwo7p3F"
-            },
-            "options": {},
-            "showLastUpdated": false,
-            "showProgressBar": true,
-            "title": "Top Targeted User Accounts",
-            "type": "splunk.bar"
-        },
-        "viz_zMg0ZOcu": {
-            "containerOptions": {},
-            "context": {},
-            "dataSources": {
-                "primary": "ds_UygMgmHH"
-            },
-            "options": {},
-            "showLastUpdated": false,
-            "showProgressBar": true,
-            "title": "Brute Force Alerts (High Severity)",
-            "type": "splunk.singlevalue"
-        }
-    },
-    "dataSources": {
-        "ds_0RbSTeqq": {
-            "name": "Abrupt VPN Drops search",
-            "options": {
-                "query": "sourcetype=cisco_firewall \"Connection Lost\"\n| stats count as \"Abrupt VPN Drops\"",
-                "queryParameters": {
-                    "earliest": "-24h@h",
-                    "latest": "now",
-                    "sampleRatio": 1
-                }
-            },
-            "type": "ds.search"
-        },
-        "ds_0mnruKyA": {
-            "name": "MITRE ATT_CK Framework Mapping search",
-            "options": {
-                "query": "(sourcetype=linux_secure \"Failed password\") OR (sourcetype=winauthentication_security EventCode=4625) OR (sourcetype=cisco_firewall \"Connection Lost\")\n| rex field=_raw \"for (?<extracted_user>\\S+) from\"\n| eval target_user=coalesce(user, extracted_user)\n| eval Attack_Type=case(\n    target_user==\"root\" OR target_user==\"Administrator\", \"Privileged Account Brute Force\", \n    sourcetype==\"cisco_firewall\", \"Abrupt Boundary Session Drop\", \n    1=1, \"Standard Endpoint Brute Force\")\n| eval MITRE_ID=case(\n    Attack_Type==\"Privileged Account Brute Force\", \"T1078 (Valid Accounts)\", \n    Attack_Type==\"Abrupt Boundary Session Drop\", \"T1133 (External Remote Services)\", \n    Attack_Type==\"Standard Endpoint Brute Force\", \"T1110 (Brute Force)\")\n| eval Severity=case(\n    Attack_Type==\"Privileged Account Brute Force\", \"CRITICAL\", \n    Attack_Type==\"Abrupt Boundary Session Drop\", \"MEDIUM\", \n    Attack_Type==\"Standard Endpoint Brute Force\", \"HIGH\")\n| stats count by Attack_Type, Severity, MITRE_ID\n| rename count as \"Event Count\"\n| sort - \"Event Count\"",
-                "queryParameters": {
-                    "earliest": "-24h@h",
-                    "latest": "now",
-                    "sampleRatio": 1
-                }
-            },
-            "type": "ds.search"
-        },
-        "ds_UygMgmHH": {
-            "name": "Brute Force Alerts _High Severity_ - Table search",
-            "options": {
-                "query": "(sourcetype=linux_secure \"Failed password\") OR (sourcetype=winauthentication_security EventCode=4625)\n| stats count as \"Brute Force Alerts\"",
-                "queryParameters": {
-                    "earliest": "-24h@h",
-                    "latest": "now",
-                    "sampleRatio": 1
-                }
-            },
-            "type": "ds.search"
-        },
-        "ds_bnwo7p3F": {
-            "name": "Top Targeted User Accounts search",
-            "options": {
-                "query": "(sourcetype=linux_secure \"Failed password\") OR (sourcetype=winauthentication_security EventCode=4625)\n| rex field=_raw \"for (?<extracted_user>\\S+) from\"\n| eval target_user=coalesce(user, extracted_user)\n| stats count by target_user\n| sort - count\n| head 5",
-                "queryParameters": {
-                    "earliest": "-24h@h",
-                    "latest": "now",
-                    "sampleRatio": 1
-                }
-            },
-            "type": "ds.search"
-        },
-        "ds_s6i7OhqB": {
-            "name": "Multi IP Search search",
-            "options": {
-                "query": "(sourcetype=linux_secure \"Failed password\") OR (sourcetype=winauthentication_security EventCode=4625)\n| rex field=_raw \"from (?<extracted_ip>\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\"\n| eval src_ip=coalesce(ip, extracted_ip)\n| rex field=_raw \"for (?<extracted_user>\\S+) from\"\n| eval target_user=coalesce(user, extracted_user)\n| where isnotnull(target_user) AND isnotnull(src_ip)\n| stats dc(src_ip) as unique_ips values(src_ip) as attacking_sources by target_user\n| where unique_ips > 1\n| rename unique_ips as \"Distinct Attacking IPs\", target_user as \"Compromised Target User\"",
-                "queryParameters": {
-                    "earliest": "-24h@h",
-                    "latest": "now",
-                    "sampleRatio": 1
-                }
-            },
-            "type": "ds.search"
-        }
-    },
-    "layout": {
-        "globalInputs": [
-            "input_global_trp"
-        ],
-        "layoutDefinitions": {
-            "layout_1": {
-                "options": {
-                    "height": 960,
-                    "width": 1440
-                },
-                "structure": [
-                    {
-                        "item": "viz_zMg0ZOcu",
-                        "position": {
-                            "h": 250,
-                            "w": 1440,
-                            "x": 0,
-                            "y": 0
-                        },
-                        "type": "block"
-                    },
-                    {
-                        "item": "viz_iB7BBZ0h",
-                        "position": {
-                            "h": 300,
-                            "w": 1440,
-                            "x": 0,
-                            "y": 250
-                        },
-                        "type": "block"
-                    },
-                    {
-                        "item": "viz_1O4xXdO0",
-                        "position": {
-                            "h": 300,
-                            "w": 1440,
-                            "x": 0,
-                            "y": 550
-                        },
-                        "type": "block"
-                    },
-                    {
-                        "item": "viz_EUi96nVp",
-                        "position": {
-                            "h": 300,
-                            "w": 1440,
-                            "x": 0,
-                            "y": 850
-                        },
-                        "type": "block"
-                    },
-                    {
-                        "item": "viz_JluEFgMm",
-                        "position": {
-                            "h": 300,
-                            "w": 1440,
-                            "x": 0,
-                            "y": 1150
-                        },
-                        "type": "block"
-                    }
-                ],
-                "type": "grid"
-            }
-        },
-        "options": {},
-        "tabs": {
-            "items": [
-                {
-                    "label": "New tab",
-                    "layoutId": "layout_1"
-                }
-            ]
-        }
-    },
-    "applicationProperties": {
-        "hideEdit": false,
-        "hideExport": false
+      "global": {
+        "showProgressBar": true
+      }
     }
+  },
+  "inputs": {
+    "input_global_trp": {
+      "type": "input.timerange",
+      "options": {
+        "token": "global_time",
+        "defaultValue": "-24h@h,now"
+      },
+      "title": "Global Time Range"
+    }
+  },
+  "layout": {
+    "options": {},
+    "globalInputs": [
+      "input_global_trp"
+    ],
+    "tabs": {
+      "items": [
+        {
+          "layoutId": "layout_UbtPQJ1v",
+          "label": "Top Targeted User Accounts"
+        },
+        {
+          "layoutId": "layout_1",
+          "label": "Brute Force Alerts"
+        },
+        {
+          "layoutId": "layout_v9l9mVQ9",
+          "label": "Abrupt VPN Drops"
+        },
+        {
+          "layoutId": "layout_vBfsRKl5",
+          "label": "MITRE ATTACK"
+        },
+        {
+          "layoutId": "layout_i1Pr1S9W",
+          "label": "Multi IP Search"
+        }
+      ]
+    },
+    "layoutDefinitions": {
+      "layout_1": {
+        "type": "grid",
+        "structure": [
+          {
+            "item": "viz_LXdy2vxR",
+            "type": "block",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "w": 1440,
+              "h": 76
+            }
+          }
+        ],
+        "options": {
+          "width": 1440,
+          "height": 960
+        }
+      },
+      "layout_UbtPQJ1v": {
+        "type": "grid",
+        "structure": [
+          {
+            "item": "viz_c83aCXmf",
+            "type": "block",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "w": 1200,
+              "h": 400
+            }
+          }
+        ]
+      },
+      "layout_v9l9mVQ9": {
+        "type": "grid",
+        "structure": [
+          {
+            "item": "viz_cHCG3sSh",
+            "type": "block",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "w": 1200,
+              "h": 400
+            }
+          }
+        ]
+      },
+      "layout_vBfsRKl5": {
+        "type": "grid",
+        "structure": [
+          {
+            "item": "viz_lncVDDh8",
+            "type": "block",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "w": 1200,
+              "h": 400
+            }
+          }
+        ]
+      },
+      "layout_i1Pr1S9W": {
+        "type": "grid",
+        "structure": [
+          {
+            "item": "viz_kSAFyUE3",
+            "type": "block",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "w": 1200,
+              "h": 400
+            }
+          }
+        ]
+      }
+    }
+  },
+  "description": "",
+  "title": "SOC Log Analyzer Dashboard"
 }
